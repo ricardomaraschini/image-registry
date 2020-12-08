@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	imageapiv1 "github.com/openshift/api/image/v1"
 	imageclientv1 "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
@@ -40,6 +41,11 @@ func TestPullthroughBlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create Kubernetes client: %s", err)
 	}
+	defer func() {
+		if t.Failed() {
+			framework.DumpDebugInfo(kubeClient, testproject.Name)
+		}
+	}()
 
 	remoteRegistryAddr, remoteRegistryPodName, _ := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), testproject.Name, nil)
 
