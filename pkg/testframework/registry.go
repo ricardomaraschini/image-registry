@@ -1,11 +1,13 @@
 package testframework
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -207,6 +209,71 @@ func MakeDockerConfigSecret(name string, config *DockerConfig) (*corev1.Secret, 
 	}, nil
 }
 
+func dumpEphemeralRegistryObjects(
+	ctx context.Context,
+	t *testing.T,
+	namespace string,
+	name string,
+	kubeClient kubeclient.Interface,
+	routeClient routeclient.Interface,
+) {
+	marshalobj := func(desc string, obj interface{}) {
+		dt, err := json.Marshal(obj)
+		if err != nil {
+			t.Logf("error marshaling %s: %s", desc, err)
+			t.Logf("%+v", obj)
+			return
+		}
+		t.Logf("%s : %s", desc, string(dt))
+	}
+
+	if pod, err := kubeClient.CoreV1().Pods(namespace).Get(
+		ctx, name, metav1.GetOptions{},
+	); err != nil {
+		t.Logf("error fetching registry pod: %s", err)
+	} else {
+		marshalobj("registry pod", pod)
+	}
+
+	if svc, err := kubeClient.CoreV1().Services(namespace).Get(
+		ctx, name, metav1.GetOptions{},
+	); err != nil {
+		t.Logf("error fetching registry service: %s", err)
+	} else {
+		marshalobj("registry service", svc)
+	}
+
+	if rt, err := routeClient.RouteV1().Routes(namespace).Get(
+		ctx, name, metav1.GetOptions{},
+	); err != nil {
+		t.Logf("error fetching registry route: %s", err)
+	} else {
+		marshalobj("registry route", rt)
+	}
+
+	logs, err := kubeClient.CoreV1().Pods(namespace).GetLogs(
+		name, &corev1.PodLogOptions{},
+	).Stream(ctx)
+	if err != nil {
+		t.Logf("error reading pod logs: %s", err)
+		return
+	}
+	defer logs.Close()
+
+	t.Log("dumping ephemeral registry pod logs:")
+	lreader := bufio.NewReader(logs)
+	for {
+		line, err := lreader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				t.Logf("error reading pod logs: %s", err)
+			}
+			return
+		}
+		t.Log(line)
+	}
+}
+
 type CleanupFunc func()
 
 func CreateEphemeralRegistry(t *testing.T, restConfig *rest.Config, namespace string, accounts map[string]string) (string, string, CleanupFunc) {
@@ -224,7 +291,13 @@ func CreateEphemeralRegistry(t *testing.T, restConfig *rest.Config, namespace st
 
 	name := "ephemeral-registry-" + utilrand.String(5)
 
-	var cleaners []CleanupFunc
+	var cleaners = []CleanupFunc{
+		func() {
+			if t.Failed() {
+				dumpEphemeralRegistryObjects(ctx, t, namespace, name, kubeClient, routeClient)
+			}
+		},
+	}
 	cleanup := func() {
 		for _, c := range cleaners {
 			c()

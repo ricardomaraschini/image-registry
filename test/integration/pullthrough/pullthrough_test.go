@@ -109,7 +109,8 @@ func TestPullThroughInsecure(t *testing.T) {
 		imageSize += size
 	}
 
-	remoteRegistryAddr, _, _ := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), namespace, nil)
+	remoteRegistryAddr, _, cleanup := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), namespace, nil)
+	defer cleanup()
 
 	remoteRepo, err := testutil.NewInsecureRepository(remoteRegistryAddr+"/"+isname, nil)
 	if err != nil {

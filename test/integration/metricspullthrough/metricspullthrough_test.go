@@ -39,9 +39,10 @@ func TestMetricsPullthroughBlob(t *testing.T) {
 	kubeClient := kubeclient.NewForConfigOrDie(master.AdminKubeConfig())
 	imageClient := imageclient.NewForConfigOrDie(master.AdminKubeConfig())
 
-	remoteRegistryAddr, _, _ := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), testproject.Name, map[string]string{
+	remoteRegistryAddr, _, cleanup := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), testproject.Name, map[string]string{
 		"remoteuser": "remotepass",
 	})
+	defer cleanup()
 
 	remoteRepo, err := testutil.NewInsecureRepository(remoteRegistryAddr+"/remoteimage", testutil.NewBasicCredentialStore("remoteuser", "remotepass"))
 	if err != nil {

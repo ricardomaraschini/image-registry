@@ -41,7 +41,8 @@ func TestPullthroughBlob(t *testing.T) {
 		t.Fatalf("failed to create Kubernetes client: %s", err)
 	}
 
-	remoteRegistryAddr, remoteRegistryPodName, _ := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), testproject.Name, nil)
+	remoteRegistryAddr, remoteRegistryPodName, cleanup := testframework.CreateEphemeralRegistry(t, master.AdminKubeConfig(), testproject.Name, nil)
+	defer cleanup()
 
 	requestCounter := counter.New()
 
