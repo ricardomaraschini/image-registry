@@ -278,7 +278,9 @@ func (is *imageStream) IdentifyCandidateRepositories(ctx context.Context, primar
 
 	localRegistry, _ := is.localRegistry(ctx)
 
-	repositoryCandidates, search := identifyCandidateRepositories(stream, localRegistry, primary)
+	repositoryCandidates, search := identifyCandidateRepositories(
+		is.imageStreamGetter.isNamespacer, stream, localRegistry, primary,
+	)
 	return repositoryCandidates, search, nil
 }
 

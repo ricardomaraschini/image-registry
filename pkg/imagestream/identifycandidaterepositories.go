@@ -1,10 +1,15 @@
 package imagestream
 
 import (
+	"context"
 	"sort"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 
 	imageapiv1 "github.com/openshift/api/image/v1"
 
+	"github.com/openshift/image-registry/pkg/dockerregistry/server/client"
 	imageapi "github.com/openshift/image-registry/pkg/origin-common/image/apis/image"
 )
 
@@ -50,6 +55,7 @@ func stringListContains(list []string, val string) bool {
 // the worst and a map of remote repositories referenced by this image stream. The best candidate is a secure
 // one. The worst allows for insecure transport.
 func identifyCandidateRepositories(
+	isNamespacer client.ImageStreamsNamespacer,
 	is *imageapiv1.ImageStream,
 	localRegistry []string,
 	primary bool,
@@ -83,10 +89,19 @@ func identifyCandidateRepositories(
 			if err != nil {
 				continue
 			}
-			// skip anything that matches the innate registry
-			// TODO: there may be a better way to make this determination
 			if stringListContains(localRegistry, ref.Registry) {
-				continue
+				nis, err := isNamespacer.ImageStreams(
+					ref.Namespace,
+				).Get(
+					context.TODO(), ref.Name, metav1.GetOptions{},
+				)
+				if err != nil {
+					klog.Errorf("error fetching referred image stream: %s", err)
+					continue
+				}
+				return identifyCandidateRepositories(
+					isNamespacer, nis, localRegistry, primary,
+				)
 			}
 			ref = ref.DockerClientDefaults()
 			insecure := insecureByDefault
